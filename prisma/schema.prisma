@@ -17,6 +17,7 @@ model Tenant {
 
   memberships Membership[]
   roles       Role[]
+  Order       Order[]
 }
 
 model User {
@@ -24,7 +25,7 @@ model User {
   name      String?
   email     String   @unique
   phone     String?  @unique
-  password  String   // ✅ minimal auth için required olsun
+  password  String // ✅ minimal auth için required olsun
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -32,8 +33,72 @@ model User {
   sessions    AuthSession[]
 }
 
+model Order {
+  id           String      @id @default(cuid())
+  tenantId     String
+  source       OrderSource @default(INTERNAL)
+  externalCode String? // marketplace order code etc.
+  status       OrderStatus @default(CREATED)
+
+  currency String @default("TRY")
+  subtotal Int    @default(0) // kuruş
+  total    Int    @default(0) // kuruş
+
+  customerName  String?
+  customerPhone String?
+  addressLine   String?
+  addressNote   String?
+
+  // future-proof "READY" ihtiyacı
+  readyAt DateTime?
+  meta    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items  OrderItem[]
+  events OrderEvent[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+
+  productId String? // snapshot-first: opsiyonel
+  name      String
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id      String @id @default(cuid())
+  orderId String
+
+  type     String // e.g. "ORDER_CREATED", "STATUS_CHANGED"
+  provider String? // e.g. "INTERNAL", "TRENDYOL"
+  payload  Json?
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
 model AuthSession {
-  token     String   @id            // ✅ cookie’de taşıyacağımız token
+  token     String   @id // ✅ cookie’de taşıyacağımız token
   userId    String
   createdAt DateTime @default(now())
   expiresAt DateTime
@@ -70,13 +135,13 @@ enum MembershipStatus {
 model Role {
   id        String   @id @default(cuid())
   tenantId  String
-  key       String   // "ADMIN", "OPS" vs
+  key       String // "ADMIN", "OPS" vs
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  permissions RolePermission[]
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
   roleBindings RoleBinding[]
 
   @@unique([tenantId, key])
@@ -112,4 +177,18 @@ model RoleBinding {
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([membershipId, roleId])
+}
+
+enum OrderSource {
+  INTERNAL
+  MARKETPLACE
+}
+
+enum OrderStatus {
+  CREATED
+  CONFIRMED
+  PREPARING
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
 }
