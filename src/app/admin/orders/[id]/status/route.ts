@@ -7,16 +7,6 @@ function getId(req: Request) {
   return pathname.split("/").slice(-2)[0]
 }
 
-/* 🔒 Allowed status transitions */
-const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-  CREATED: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["PREPARING", "CANCELLED"],
-  PREPARING: ["ON_THE_WAY", "CANCELLED"],
-  ON_THE_WAY: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
-}
-
 export async function PATCH(req: Request) {
   try {
     const id = getId(req)
@@ -42,21 +32,10 @@ export async function PATCH(req: Request) {
       )
     }
 
-    /* 🔒 Marketplace guard */
     if (order.source !== "INTERNAL") {
       return NextResponse.json(
         { error: "Marketplace orders cannot be modified" },
         { status: 403 }
-      )
-    }
-
-    /* 🔒 Transition guard */
-    const allowed = allowedTransitions[order.status]
-
-    if (!allowed.includes(status)) {
-      return NextResponse.json(
-        { error: "Invalid status transition" },
-        { status: 400 }
       )
     }
 
