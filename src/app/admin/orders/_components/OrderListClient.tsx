@@ -48,9 +48,7 @@ export default function OrderListClient({
 
             <div className="mt-6 flex justify-between text-sm text-gray-400">
               <span>{order.source}</span>
-              <span>
-                {new Date(order.createdAt).toLocaleString()}
-              </span>
+              <span>{new Date(order.createdAt).toLocaleString()}</span>
             </div>
           </div>
         ))}

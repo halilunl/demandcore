@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { OrderStatus } from "@prisma/client"
+import { OrderStatus, OrderSource } from "@prisma/client"
+import { writeAuditLog } from "@/lib/audit"
 
 function getId(req: Request) {
   const pathname = new URL(req.url).pathname
   return pathname.split("/").slice(-2)[0]
 }
 
-/* 🔒 Allowed status transitions */
 const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   CREATED: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["PREPARING", "CANCELLED"],
@@ -21,10 +21,30 @@ export async function PATCH(req: Request) {
   try {
     const id = getId(req)
 
-    if (!id) {
+if (!id) {
+  return NextResponse.json(
+    { error: "Invalid order id" },
+    { status: 400 }
+  )
+}
+
+    const tenantSlug = req.headers.get("x-tenant")
+
+    if (!tenantSlug) {
       return NextResponse.json(
-        { error: "Missing order id" },
-        { status: 400 }
+        { error: "Tenant header required" },
+        { status: 401 }
+      )
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    })
+
+    if (!tenant) {
+      return NextResponse.json(
+        { error: "Invalid tenant" },
+        { status: 401 }
       )
     }
 
@@ -35,22 +55,20 @@ export async function PATCH(req: Request) {
       where: { id },
     })
 
-    if (!order) {
+    if (!order || order.tenantId !== tenant.id) {
       return NextResponse.json(
         { error: "Order not found" },
         { status: 404 }
       )
     }
 
-    /* 🔒 Marketplace guard */
-    if (order.source !== "INTERNAL") {
+    if (order.source !== OrderSource.INTERNAL) {
       return NextResponse.json(
         { error: "Marketplace orders cannot be modified" },
         { status: 403 }
       )
     }
 
-    /* 🔒 Transition guard */
     const allowed = allowedTransitions[order.status]
 
     if (!allowed.includes(status)) {
@@ -60,16 +78,27 @@ export async function PATCH(req: Request) {
       )
     }
 
+    const oldStatus = order.status
+
     const updated = await prisma.order.update({
       where: { id },
       data: { status },
+    })
+
+    await writeAuditLog({
+      tenantId: order.tenantId,
+      action: "STATUS_CHANGE",
+      entity: "Order",
+      entityId: order.id,
+      oldValue: { status: oldStatus },
+      newValue: { status: updated.status },
+      req,
     })
 
     return NextResponse.json(updated)
 
   } catch (error) {
     console.error(error)
-
     return NextResponse.json(
       { error: "Server error" },
       { status: 500 }

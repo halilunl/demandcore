@@ -18,6 +18,8 @@ model Tenant {
   memberships Membership[]
   roles       Role[]
   Order       Order[]
+
+  auditLogs AuditLog[]
 }
 
 model User {
@@ -31,6 +33,8 @@ model User {
 
   memberships Membership[]
   sessions    AuthSession[]
+
+  auditLogs AuditLog[]
 }
 
 model Order {
@@ -95,6 +99,33 @@ model OrderEvent {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  tenantId String?
+  userId   String?
+
+  action   String
+  entity   String
+  entityId String?
+
+  oldValue Json?
+  newValue Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
 }
 
 model AuthSession {

@@ -1,5 +1,5 @@
 "use client"
-
+/// <reference lib="dom" />
 import { useEffect, useState } from "react"
 import { Order, OrderItem, OrderStatus } from "@prisma/client"
 
@@ -36,12 +36,14 @@ export default function OrderDrawer({
       setLoading(true)
 
       const res = await fetch(
-        `/admin/orders/${order.id}`,
-        {
-          credentials: "include",
-          headers: { "x-tenant": TENANT },
-        }
-      )
+  `/admin/orders/${order.id}`,
+  {
+    credentials: "include",
+    headers: {
+      "x-tenant": TENANT
+    }
+  }
+)
 
       if (!res.ok) {
         console.error("Order fetch failed")
@@ -50,9 +52,8 @@ export default function OrderDrawer({
       }
 
       const data = await res.json()
-      setFullOrder(data)
-      setLoading(false)
-    }
+setFullOrder(data.order ?? data)
+setLoading(false)}
 
     load()
   }, [order])
@@ -83,19 +84,15 @@ export default function OrderDrawer({
     )
 
     try {
-      const res = await fetch(
-        `/admin/orders/${fullOrder.id}/status`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "x-tenant": TENANT,
-          },
-          body: JSON.stringify({ status: newStatus }),
-        }
-      )
-
+      const res = await fetch("/api/orders/" + fullOrder.id + "/status", {
+  method: "PATCH" ,
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    "x-tenant": TENANT,
+  },
+  body: JSON.stringify({ status: newStatus }),
+});
       if (!res.ok) throw new Error("Update failed")
 
       // Parent listeyi güncelle

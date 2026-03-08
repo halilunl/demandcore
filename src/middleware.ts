@@ -1,26 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/api/auth/login",
-  "/api/health",
-  "/api/debug",
-];
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only protect API routes
+  // API dışı yolları geç
   if (!pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
-  // Public endpoints
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  // Auth endpointleri serbest
+  if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  // Tenant header required
+  // Tenant header kontrolü
   const tenant = req.headers.get("x-tenant");
   if (!tenant) {
     return NextResponse.json(
@@ -29,10 +23,9 @@ export function middleware(req: NextRequest) {
     );
   }
 
-  // Session cookie required
-  const hasSession = req.cookies.get("dc_session");
-
-  if (!hasSession) {
+  // Session cookie kontrolü
+  const session = req.cookies.get("dc_session");
+  if (!session) {
     return NextResponse.json(
       { error: "Unauthorized (no session)" },
       { status: 401 }

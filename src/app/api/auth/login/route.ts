@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import bcrypt from "bcryptjs"
+import * as bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 
 function randomToken() {
@@ -15,7 +15,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "email/password required" }, { status: 400 })
   }
 
-  const user = await prisma.user.findUnique({ where: { email } })
+  const user = await prisma.user.findUnique({
+  where: { email },
+  select: {
+    id: true,
+    email: true,
+    password: true,
+  }
+})
   if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
 
   const ok = await bcrypt.compare(password, user.password)
@@ -23,10 +30,21 @@ export async function POST(req: Request) {
 
   const token = randomToken()
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7) // 7 gün
+  
 
   await prisma.authSession.create({
     data: { token, userId: user.id, expiresAt },
   })
+
+  // 🔵 AUDIT LOG
+  await prisma.auditLog.create({
+  data: {
+    userId: user.id,
+    action: "LOGIN_SUCCESS",
+    entity: "auth",
+    entityId: user.id
+  }
+})
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set("dc_session", token, {
