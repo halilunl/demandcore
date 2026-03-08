@@ -15,6 +15,7 @@ type Props = {
 
 const TENANT = "a"
 
+
 export default function OrderDrawer({
   order,
   onClose,
@@ -84,15 +85,16 @@ setLoading(false)}
     )
 
     try {
-      const res = await fetch("/api/orders/" + fullOrder.id + "/status", {
-  method: "PATCH" ,
+      const res = await fetch("/api/orders/" + fullOrder.id + "/status?tenant=a", {
+  method: "PATCH",
   credentials: "include",
   headers: {
     "Content-Type": "application/json",
-    "x-tenant": TENANT,
+    "x-tenant": "a"
   },
   body: JSON.stringify({ status: newStatus }),
-});
+})
+
       if (!res.ok) throw new Error("Update failed")
 
       // Parent listeyi güncelle

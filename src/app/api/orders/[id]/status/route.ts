@@ -3,11 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { OrderStatus, OrderSource } from "@prisma/client"
 import { writeAuditLog } from "@/lib/audit"
 
-function getId(req: Request) {
-  const pathname = new URL(req.url).pathname
-  return pathname.split("/").slice(-2)[0]
-}
-
 const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   CREATED: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["PREPARING", "CANCELLED"],
@@ -19,23 +14,29 @@ const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
 
 export async function PATCH(req: Request) {
   try {
-    const id = getId(req)
 
-if (!id) {
-  return NextResponse.json(
-    { error: "Invalid order id" },
-    { status: 400 }
-  )
-}
+    const pathname = new URL(req.url).pathname
+    const id = pathname.split("/").slice(-2)[0]
 
-    const tenantSlug = req.headers.get("x-tenant")
-
-    if (!tenantSlug) {
+    if (!id) {
       return NextResponse.json(
-        { error: "Tenant header required" },
-        { status: 401 }
+        { error: "Invalid order id" },
+        { status: 400 }
       )
     }
+
+    const url = new URL(req.url)
+
+const tenantSlug =
+  req.headers.get("x-tenant") ||
+  url.searchParams.get("tenant")
+
+if (!tenantSlug) {
+  return NextResponse.json(
+    { error: "Tenant header required" },
+    { status: 401 }
+  )
+}
 
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
