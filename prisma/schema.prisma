@@ -98,6 +98,9 @@ model Job {
   queue JobQueue[]
 
   @@index([tenantId])
+
+  @@index([tenantId, status])
+  @@index([tenantId, source])
 }
 
 model JobAssignment {
