@@ -8,99 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Tenant {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  memberships Membership[]
-  roles       Role[]
-  Order       Order[]
-
-  auditLogs AuditLog[]
-}
-
-model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  phone     String?  @unique
-  password  String // ✅ minimal auth için required olsun
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  memberships Membership[]
-  sessions    AuthSession[]
-
-  auditLogs AuditLog[]
-}
-
-model Order {
-  id           String      @id @default(cuid())
-  tenantId     String
-  source       OrderSource @default(INTERNAL)
-  externalCode String? // marketplace order code etc.
-  status       OrderStatus @default(CREATED)
-
-  currency String @default("TRY")
-  subtotal Int    @default(0) // kuruş
-  total    Int    @default(0) // kuruş
-
-  customerName  String?
-  customerPhone String?
-  addressLine   String?
-  addressNote   String?
-
-  // future-proof "READY" ihtiyacı
-  readyAt DateTime?
-  meta    Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items  OrderItem[]
-  events OrderEvent[]
-
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId, createdAt])
-  @@index([tenantId, status, createdAt])
-}
-
-model OrderItem {
-  id      String @id @default(cuid())
-  orderId String
-
-  productId String? // snapshot-first: opsiyonel
-  name      String
-  unitPrice Int
-  quantity  Int
-  lineTotal Int
-
-  createdAt DateTime @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-}
-
-model OrderEvent {
-  id      String @id @default(cuid())
-  orderId String
-
-  type     String // e.g. "ORDER_CREATED", "STATUS_CHANGED"
-  provider String? // e.g. "INTERNAL", "TRENDYOL"
-  payload  Json?
-
-  createdAt DateTime @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId, createdAt])
-}
-
 model AuditLog {
   id String @id @default(cuid())
 
@@ -139,6 +46,162 @@ model AuthSession {
   @@index([userId])
 }
 
+model DriverCapability {
+  id String @id @default(cuid())
+
+  userId       String
+  capabilityId String
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model DriverLocation {
+  id String @id @default(cuid())
+
+  userId String
+
+  lat Float
+  lng Float
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+}
+
+model Job {
+  id       String @id @default(cuid())
+  tenantId String
+
+  title       String
+  description String?
+
+  type JobType
+
+  status JobStatus @default(CREATED)
+
+  requiredCapabilityId String?
+  requiredCapability   JobCapability? @relation(fields: [requiredCapabilityId], references: [id])
+
+  priority Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments JobAssignment[]
+  events      JobEvent[]
+  location    JobLocation?
+
+  queue JobQueue[]
+
+  @@index([tenantId])
+}
+
+model JobAssignment {
+  id String @id @default(cuid())
+
+  jobId  String
+  userId String
+
+  status AssignmentStatus @default(PENDING)
+
+  assignedAt DateTime  @default(now())
+  acceptedAt DateTime?
+
+  job  Job  @relation(fields: [jobId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([jobId])
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model JobCapability {
+  id String @id @default(cuid())
+
+  code     String @unique
+  name     String
+  category String
+
+  jobs Job[]
+}
+
+model JobEvent {
+  id String @id @default(cuid())
+
+  jobId String
+  type  String
+
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+
+model JobLocation {
+  id String @id @default(cuid())
+
+  jobId String
+
+  lat Float
+  lng Float
+
+  address String?
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@unique([jobId])
+}
+
+enum JobStatus {
+  CREATED
+  ASSIGNING
+  ASSIGNED
+  ACCEPTED
+  ON_THE_WAY
+  STARTED
+  COMPLETED
+  CANCELLED
+}
+
+enum JobType {
+  DELIVERY
+  SERVICE
+  VALET
+  TOW
+  TAXI
+}
+
+model JobQueue {
+  id String @id @default(cuid())
+
+  jobId  String
+  status QueueStatus @default(WAITING)
+
+  attempts Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id])
+
+  @@index([status])
+}
+
+enum QueueStatus {
+  WAITING
+  DISPATCHING
+  ASSIGNED
+  EXPIRED
+}
+
 model Membership {
   id        String           @id @default(cuid())
   tenantId  String
@@ -163,6 +226,94 @@ enum MembershipStatus {
   SUSPENDED
 }
 
+model Order {
+  id           String      @id @default(cuid())
+  tenantId     String
+  source       OrderSource @default(INTERNAL)
+  externalCode String? // marketplace order code etc.
+  status       OrderStatus @default(CREATED)
+
+  currency String @default("TRY")
+  subtotal Int    @default(0) // kuruş
+  total    Int    @default(0) // kuruş
+
+  customerName  String?
+  customerPhone String?
+  addressLine   String?
+  addressNote   String?
+
+  // future-proof "READY" ihtiyacı
+  readyAt DateTime?
+  meta    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items  OrderItem[]
+  events OrderEvent[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model OrderEvent {
+  id      String @id @default(cuid())
+  orderId String
+
+  type     String // e.g. "ORDER_CREATED", "STATUS_CHANGED"
+  provider String? // e.g. "INTERNAL", "TRENDYOL"
+  payload  Json?
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+
+  productId String? // snapshot-first: opsiyonel
+  name      String
+  unitPrice Int
+  quantity  Int
+  lineTotal Int
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+enum OrderSource {
+  INTERNAL
+  MARKETPLACE
+}
+
+enum OrderStatus {
+  CREATED
+  CONFIRMED
+  PREPARING
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  key       String   @unique // "orders.read" gibi
+  desc      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
 model Role {
   id        String   @id @default(cuid())
   tenantId  String
@@ -179,14 +330,15 @@ model Role {
   @@index([tenantId])
 }
 
-model Permission {
-  id        String   @id @default(cuid())
-  key       String   @unique // "orders.read" gibi
-  desc      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model RoleBinding {
+  id           String @id @default(cuid())
+  membershipId String
+  roleId       String
 
-  roles RolePermission[]
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, roleId])
 }
 
 model RolePermission {
@@ -199,27 +351,32 @@ model RolePermission {
   @@id([roleId, permissionId])
 }
 
-model RoleBinding {
-  id           String @id @default(cuid())
-  membershipId String
-  roleId       String
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+  roles       Role[]
+  Order       Order[]
 
-  @@unique([membershipId, roleId])
+  auditLogs AuditLog[]
 }
 
-enum OrderSource {
-  INTERNAL
-  MARKETPLACE
-}
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  name     String?
+  password String?
 
-enum OrderStatus {
-  CREATED
-  CONFIRMED
-  PREPARING
-  ON_THE_WAY
-  DELIVERED
-  CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  sessions    AuthSession[]
+  auditLogs   AuditLog[]
+
+  assignments JobAssignment[]
 }
