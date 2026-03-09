@@ -74,6 +74,8 @@ model Job {
   id       String @id @default(cuid())
   tenantId String
 
+  source JobSource @default(CLIENT_APP)
+
   title       String
   description String?
 
@@ -159,6 +161,13 @@ model JobLocation {
   job Job @relation(fields: [jobId], references: [id])
 
   @@unique([jobId])
+}
+
+enum JobSource {
+  CLIENT_APP
+  ADMIN_PANEL
+  API
+  SYSTEM
 }
 
 enum JobStatus {
