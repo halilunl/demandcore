@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireTenant } from "@/lib/tenant"
 import { JobType } from "@prisma/client"
+import { dispatchWorker } from "@/dispatch/dispatchWorker"
 
 export async function POST(req: Request) {
 
@@ -20,35 +21,37 @@ export async function POST(req: Request) {
 
     const job = await prisma.$transaction(async (tx) => {
 
-      const job = await tx.job.create({
-        data: {
-          tenantId: tenantResult.tenant.id,
-          type: JobType.SERVICE,
-          title: body.title,
-          description: body.description,
-          status: "CREATED"
-        }
-      })
+  const job = await tx.job.create({
+    data: {
+      tenantId: tenantResult.tenant.id,
+      type: JobType.SERVICE,
+      title: body.title,
+      description: body.description,
+      status: "CREATED"
+    }
+  })
 
-      await tx.jobLocation.create({
-        data: {
-          jobId: job.id,
-          lat: body.lat ?? 0,
-          lng: body.lng ?? 0
-        }
-      })
+  await tx.jobLocation.create({
+    data: {
+      jobId: job.id,
+      lat: body.lat ?? 0,
+      lng: body.lng ?? 0
+    }
+  })
 
-      await tx.jobEvent.create({
-        data: {
-          jobId: job.id,
-          type: "JOB_CREATED"
-        }
-      })
+  await tx.jobEvent.create({
+    data: {
+      jobId: job.id,
+      type: "JOB_CREATED"
+    }
+  })
 
-      return job
-    })
+  return job
+})
 
-    return NextResponse.json(job)
+await dispatchWorker(job.id)
+
+return NextResponse.json(job)
 
   } catch (err: unknown) {
 

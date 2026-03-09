@@ -16,21 +16,30 @@ export async function POST(req: Request) {
   }
 
   const user = await prisma.user.findUnique({
-  where: { email },
-  select: {
-    id: true,
-    email: true,
-    password: true,
+    where: { email },
+    select: {
+      id: true,
+      email: true,
+      password: true,
+    }
+  })
+
+  // 🟢 user null olabilir
+  if (!user || !user.password) {
+    return NextResponse.json(
+      { error: "Invalid credentials" },
+      { status: 401 }
+    )
   }
-})
-  if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
 
   const ok = await bcrypt.compare(password, user.password)
-  if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+
+  if (!ok) {
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+  }
 
   const token = randomToken()
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7) // 7 gün
-  
 
   await prisma.authSession.create({
     data: { token, userId: user.id, expiresAt },
@@ -38,15 +47,16 @@ export async function POST(req: Request) {
 
   // 🔵 AUDIT LOG
   await prisma.auditLog.create({
-  data: {
-    userId: user.id,
-    action: "LOGIN_SUCCESS",
-    entity: "auth",
-    entityId: user.id
-  }
-})
+    data: {
+      userId: user.id,
+      action: "LOGIN_SUCCESS",
+      entity: "auth",
+      entityId: user.id
+    }
+  })
 
   const res = NextResponse.json({ ok: true })
+
   res.cookies.set("dc_session", token, {
     httpOnly: true,
     sameSite: "lax",

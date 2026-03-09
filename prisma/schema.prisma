@@ -61,6 +61,7 @@ model DriverLocation {
   id String @id @default(cuid())
 
   userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   lat Float
   lng Float
@@ -88,6 +89,9 @@ model Job {
 
   priority Int @default(0)
 
+  assignedDriverId String?
+  assignedDriver   User?   @relation("AssignedDriver", fields: [assignedDriverId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -98,7 +102,6 @@ model Job {
   queue JobQueue[]
 
   @@index([tenantId])
-
   @@index([tenantId, status])
   @@index([tenantId, source])
 }
@@ -110,6 +113,8 @@ model JobAssignment {
   userId String
 
   status AssignmentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
 
   assignedAt DateTime  @default(now())
   acceptedAt DateTime?
@@ -124,6 +129,7 @@ enum AssignmentStatus {
   PENDING
   ACCEPTED
   REJECTED
+  TIMEOUT
 }
 
 model JobCapability {
@@ -175,6 +181,7 @@ enum JobSource {
 
 enum JobStatus {
   CREATED
+  OPEN
   ASSIGNING
   ASSIGNED
   ACCEPTED
@@ -383,6 +390,8 @@ model User {
   name     String?
   password String?
 
+  driverLocation DriverLocation?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -391,4 +400,6 @@ model User {
   auditLogs   AuditLog[]
 
   assignments JobAssignment[]
+
+  assignedJobs Job[] @relation("AssignedDriver")
 }
