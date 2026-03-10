@@ -80,6 +80,7 @@ model DriverOffer {
 
   createdAt   DateTime  @default(now())
   respondedAt DateTime?
+  expiresAt   DateTime?   // ← FAZ15
 
   job    Job  @relation(fields: [jobId], references: [id])
   driver User @relation(fields: [driverId], references: [id])

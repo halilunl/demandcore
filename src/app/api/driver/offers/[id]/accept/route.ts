@@ -5,70 +5,84 @@ export async function POST(req: Request) {
 
   const offerId = req.url.split("/").slice(-2)[0]
 
-  const offer = await prisma.driverOffer.findUnique({
-    where: { id: offerId },
-    include: { job: true }
-  })
+  try {
 
-  if (!offer) {
-    return NextResponse.json({ error: "Offer not found" }, { status: 404 })
-  }
+    const result = await prisma.$transaction(async (tx) => {
 
-  if (offer.status !== "PENDING") {
-    return NextResponse.json({ error: "Offer not pending" }, { status: 400 })
-  }
+      const offer = await tx.driverOffer.findUnique({
+        where: { id: offerId },
+        include: { job: true }
+      })
 
-  const result = await prisma.$transaction(async (tx) => {
-
-    const job = await tx.job.findUnique({
-      where: { id: offer.jobId }
-    })
-
-    if (!job) throw new Error("Job not found")
-
-    if (job.status !== "CREATED") {
-      throw new Error("Job already assigned")
-    }
-
-    // assignment oluştur
-    const assignment = await tx.jobAssignment.create({
-      data: {
-        jobId: job.id,
-        userId: offer.driverId,
-        status: "ACCEPTED"
+      if (!offer) {
+        throw new Error("Offer not found")
       }
-    })
 
-    // job status update
-    await tx.job.update({
-      where: { id: job.id },
-      data: {
-        status: "ASSIGNED"
+      if (offer.status !== "PENDING") {
+        throw new Error("Offer not pending")
       }
-    })
 
-    // kabul edilen offer
-    await tx.driverOffer.update({
-      where: { id: offer.id },
-      data: { status: "ACCEPTED" }
-    })
+      const job = await tx.job.findUnique({
+        where: { id: offer.jobId }
+      })
 
-    // diğer offerlar expire
-    await tx.driverOffer.updateMany({
-      where: {
-        jobId: job.id,
-        id: { not: offer.id }
-      },
-      data: {
-        status: "EXPIRED"
+      if (!job) throw new Error("Job not found")
+
+      if (job.status !== "CREATED") {
+        throw new Error("Job already assigned")
       }
+
+      // assignment oluştur
+      const assignment = await tx.jobAssignment.create({
+        data: {
+          jobId: job.id,
+          userId: offer.driverId,
+          status: "ACCEPTED"
+        }
+      })
+
+      // job status update
+      await tx.job.update({
+        where: { id: job.id },
+        data: { status: "ASSIGNED" }
+      })
+
+      // kabul edilen offer
+      await tx.driverOffer.update({
+        where: { id: offer.id },
+        data: {
+          status: "ACCEPTED",
+          respondedAt: new Date()
+        }
+      })
+
+      // diğer offerlar expire
+      await tx.driverOffer.updateMany({
+        where: {
+          jobId: job.id,
+          id: { not: offer.id }
+        },
+        data: { status: "EXPIRED" }
+      })
+
+      return assignment
     })
 
-    return assignment
-  })
+    return NextResponse.json({
+      ok: true,
+      assignmentId: result.id
+    })
 
-  return NextResponse.json({
-    ok: true,
-    assignmentId: result.id
-  })
+  } catch (err: unknown) {
+
+  const message =
+    err instanceof Error ? err.message : "Accept failed"
+
+  return NextResponse.json(
+    { error: message },
+    { status: 400 }
+  )
+
+}
+
 }
