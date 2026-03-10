@@ -71,9 +71,34 @@ model DriverLocation {
   @@unique([userId])
 }
 
+model DriverOffer {
+  id       String @id @default(cuid())
+  jobId    String
+  driverId String
+
+  status OfferStatus @default(PENDING)
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  job    Job  @relation(fields: [jobId], references: [id])
+  driver User @relation(fields: [driverId], references: [id])
+
+  @@unique([jobId, driverId])
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
 model Job {
   id       String @id @default(cuid())
   tenantId String
+
+  offers DriverOffer[]
 
   source JobSource @default(CLIENT_APP)
 
@@ -394,6 +419,8 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  offers DriverOffer[]
 
   memberships Membership[]
   sessions    AuthSession[]

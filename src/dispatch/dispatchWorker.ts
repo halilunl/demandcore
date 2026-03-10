@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { findDrivers } from "./findDrivers"
+import { broadcastOffers } from "./offerEngine"
 
 export async function dispatchWorker(jobId: string) {
 
@@ -22,7 +23,12 @@ export async function dispatchWorker(jobId: string) {
 
   // uygun driverları bul
   const drivers = (await findDrivers(job))
-    .filter(d => !previousDrivers.includes(d.userId))
+  .filter(d => !previousDrivers.includes(d.userId))
+
+await broadcastOffers(
+  job.id,
+  drivers.map(d => ({ id: d.userId }))
+)
 
   if (!drivers.length) {
     console.log("dispatchWorker: no drivers found")
