@@ -1,25 +1,30 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getSession } from "@/lib/session"
 
-export async function GET(req: Request) {
-
+export async function GET() {
   try {
+    const session = await getSession()
 
-    // şimdilik test için query'den alacağız
-    const url = new URL(req.url)
-    const driverId = url.searchParams.get("driverId")
-
-    if (!driverId) {
+    if (!session) {
       return NextResponse.json(
-        { error: "driverId required" },
-        { status: 400 }
+        { error: "Unauthorized (no session)" },
+        { status: 401 }
       )
     }
 
-    const offers = await prisma.jobAssignment.findMany({
+    const now = new Date()
+
+    const offers = await prisma.driverOffer.findMany({
       where: {
-        userId: driverId,
-        status: "PENDING"
+        driverId: session.userId,
+        status: "PENDING",
+        expiresAt: {
+          gt: now
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
       },
       include: {
         job: {
@@ -27,26 +32,19 @@ export async function GET(req: Request) {
             location: true
           }
         }
-      },
-      orderBy: {
-        createdAt: "desc"
       }
     })
 
     return NextResponse.json({
-      offers
+      ok: true,
+      items: offers
     })
-
-  } catch (err) {
-
-    const message =
-      err instanceof Error ? err.message : "UNKNOWN_ERROR"
+  } catch (error) {
+    console.error("driver offers error:", error)
 
     return NextResponse.json(
-      { error: message },
+      { error: "Internal server error" },
       { status: 500 }
     )
-
   }
-
 }
