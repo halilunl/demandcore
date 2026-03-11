@@ -88,6 +88,12 @@ model DriverOffer {
   @@unique([jobId, driverId])
 }
 
+enum DriverStatus {
+  OFFLINE
+  ONLINE
+  BUSY
+}
+
 enum OfferStatus {
   PENDING
   ACCEPTED
@@ -415,6 +421,8 @@ model User {
   email    String  @unique
   name     String?
   password String?
+  
+  driverStatus DriverStatus @default(OFFLINE)
 
   driverLocation DriverLocation?
 

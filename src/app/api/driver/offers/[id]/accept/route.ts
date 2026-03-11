@@ -42,10 +42,20 @@ export async function POST(req: Request) {
       })
 
       // job status update
-      await tx.job.update({
-        where: { id: job.id },
-        data: { status: "ASSIGNED" }
-      })
+      // job status update
+await tx.job.update({
+  where: { id: job.id },
+  data: {
+    status: "ASSIGNED"
+  }
+})
+
+// driver artık meşgul
+await tx.user.update({
+  where: { id: offer.driverId },
+  data: { driverStatus: "BUSY" }
+})
+
 
       // kabul edilen offer
       await tx.driverOffer.update({

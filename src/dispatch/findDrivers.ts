@@ -15,7 +15,13 @@ export async function findDrivers(job: JobInput) {
 
   if (!jobLat || !jobLng) return []
 
-  const drivers = await prisma.driverLocation.findMany()
+  const drivers = await prisma.driverLocation.findMany({
+  where: {
+    user: {
+      driverStatus: "ONLINE"
+    }
+  }
+})
 
   const results = drivers.map(d => {
 
