@@ -46,6 +46,30 @@ model AuthSession {
   @@index([userId])
 }
 
+model DispatchConfig {
+  id String @id @default(cuid())
+
+  tenantId String?
+
+  radiusKm        Int @default(3)
+  maxDrivers      Int @default(3)
+  offerTimeoutSec Int @default(10)
+
+  dispatchMode DispatchMode @default(SEQUENTIAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+enum DispatchMode {
+  SEQUENTIAL
+  BROADCAST
+}
+
 model DriverCapability {
   id String @id @default(cuid())
 
@@ -419,7 +443,8 @@ model Tenant {
   roles       Role[]
   Order       Order[]
 
-  auditLogs AuditLog[]
+  auditLogs      AuditLog[]
+  DispatchConfig DispatchConfig[]
 }
 
 model User {

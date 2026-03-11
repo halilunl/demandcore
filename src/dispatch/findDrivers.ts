@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { haversineDistance } from "@/lib/geo/distance"
+import { getDispatchConfig } from "./config"
 
 type JobInput = {
   tenantId?: string
@@ -10,14 +11,18 @@ type JobInput = {
   } | null
 }
 
-const RADIUS_KM = 3
-const MAX_DRIVERS = 10
-
 export async function findDrivers(job: JobInput) {
+
   const jobLat = job.location?.lat
   const jobLng = job.location?.lng
 
   if (jobLat == null || jobLng == null) return []
+
+  // FAZ20 config yükle
+  const config = await getDispatchConfig(job.tenantId)
+
+  const RADIUS_KM = config.radiusKm
+  const MAX_DRIVERS = config.maxDrivers
 
   const drivers = await prisma.driverLocation.findMany({
     where: {
