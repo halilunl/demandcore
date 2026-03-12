@@ -17,6 +17,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // realtime stream bypass
+  if (pathname.startsWith("/api/realtime")) {
+    return NextResponse.next();
+  }
+
   const tenant = req.headers.get("x-tenant");
 
   if (!tenant) {
