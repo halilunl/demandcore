@@ -2,43 +2,22 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
 
-  if (!pathname.startsWith("/api")) {
-    return NextResponse.next();
-  }
-
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
-
-  // dispatch worker bypass
-  if (pathname.startsWith("/api/dispatch")) {
-    return NextResponse.next();
-  }
-
-  // realtime stream bypass
-  if (pathname.startsWith("/api/realtime")) {
-    return NextResponse.next();
-  }
-
-  const tenant = req.headers.get("x-tenant");
+  const tenant = req.headers.get("x-tenant")
 
   if (!tenant) {
     return NextResponse.json(
       { error: "Tenant header required" },
       { status: 400 }
-    );
+    )
   }
 
-  const session = req.cookies.get("dc_session");
+  const res = NextResponse.next()
+  res.headers.set("x-tenant-id", tenant)
 
-  if (!session) {
-    return NextResponse.json(
-      { error: "Unauthorized (no session)" },
-      { status: 401 }
-    );
-  }
+  return res
+}
 
-  return NextResponse.next();
+export const config = {
+  matcher: ["/api/:path*"]
 }

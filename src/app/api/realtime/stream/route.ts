@@ -1,6 +1,7 @@
 import { realtimeBus } from "@/lib/realtime/bus"
 import { RealtimeEvent } from "@/lib/realtime/events"
 import { requireTenant } from "@/lib/tenant"
+import { registerDriver, unregisterDriver } from "@/realtime/driverPool"
 
 export async function GET(req: Request) {
 
@@ -12,11 +13,28 @@ export async function GET(req: Request) {
 
   const tenantId = tenantResult.tenant.id
 
+  // driverId query'den al
+  const url = new URL(req.url)
+  const driverId = url.searchParams.get("driverId")
+
+  if (!driverId) {
+    return new Response("driverId required", { status: 400 })
+  }
+
   const stream = new ReadableStream({
 
     start(controller) {
 
       const encoder = new TextEncoder()
+
+      // driver pool register
+      registerDriver(driverId, (data) => {
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+          )
+        } catch {}
+      })
 
       const unsubscribe = realtimeBus.subscribe((event: RealtimeEvent) => {
 
@@ -29,16 +47,18 @@ export async function GET(req: Request) {
       })
 
       const keepAlive = setInterval(() => {
-  try {
-    controller.enqueue(
-      encoder.encode(": keepalive\n\n")
-    )
-  } catch {
-    clearInterval(keepAlive)
-  }
-}, 15000)
+        try {
+          controller.enqueue(
+            encoder.encode(": keepalive\n\n")
+          )
+        } catch {
+          clearInterval(keepAlive)
+        }
+      }, 15000)
 
       return () => {
+        // driver pool unregister
+        unregisterDriver(driverId)
         unsubscribe()
         clearInterval(keepAlive)
       }

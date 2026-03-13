@@ -14,18 +14,18 @@ export async function GET() {
     }
 
     const assignment = await prisma.jobAssignment.findFirst({
-  where: {
-    userId: session.userId,
-    status: "ACCEPTED"
-  },
-  include: {
-    job: {
+      where: {
+        userId: session.userId,
+        status: "ACCEPTED"
+      },
       include: {
-        location: true
+        job: {
+          include: {
+            location: true
+          }
+        }
       }
-    }
-  }
-})
+    })
 
     if (!assignment) {
       return NextResponse.json({
@@ -35,9 +35,9 @@ export async function GET() {
     }
 
     return NextResponse.json({
-  ok: true,
-  job: assignment?.job ?? null
-})
+      ok: true,
+      job: assignment?.job ?? null
+    })
 
   } catch (error) {
     console.error("driver active job error:", error)

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { findDrivers } from "./findDrivers"
 import { broadcastOffers } from "./offerEngine"
+import { broadcastRealtimeOffer } from "./offerRealtime"
 
 export async function dispatchWorker(jobId: string) {
   const job = await prisma.job.findUnique({
@@ -31,6 +32,10 @@ export async function dispatchWorker(jobId: string) {
     job.id,
     drivers.map((d) => ({ id: d.userId }))
   )
+  await broadcastRealtimeOffer(
+  job.id,
+  drivers.map((d) => ({ id: d.userId }))
+)
 
   const topDrivers = drivers.slice(0, 3)
 
