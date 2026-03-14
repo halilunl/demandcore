@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
+import { retryDispatch } from "@/dispatch/retryDispatch"
+
 
 export async function POST(req: Request) {
 
@@ -44,12 +46,20 @@ export async function POST(req: Request) {
     }
 
     await prisma.driverOffer.update({
-      where: { id: offerId },
-      data: {
-        status: "REJECTED",
-        respondedAt: new Date()
-      }
-    })
+  where: { id: offerId },
+  data: {
+    status: "REJECTED",
+    respondedAt: new Date()
+  }
+})
+
+// yeni driverlara tekrar dispatch
+await retryDispatch(offer.jobId)
+
+return NextResponse.json({
+  ok: true
+})
+
 
     return NextResponse.json({
       ok: true
