@@ -1,9 +1,20 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { getSession } from "@/lib/session"
 
 export async function POST(req: Request) {
 
-  const offerId = req.url.split("/").slice(-2)[0]
+  const session = await getSession()
+
+  if (!session) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    )
+  }
+
+  const segments = new URL(req.url).pathname.split("/")
+  const offerId = segments[segments.length - 2]
 
   try {
 
@@ -18,9 +29,18 @@ export async function POST(req: Request) {
         throw new Error("Offer not found")
       }
 
+      if (offer.driverId !== session.userId) {
+        throw new Error("Offer does not belong to this driver")
+      }
+
       if (offer.status !== "PENDING") {
         throw new Error("Offer not pending")
       }
+
+      if (offer.expiresAt && offer.expiresAt <= new Date()) {
+  throw new Error("Offer expired")
+}
+
 
       const job = await tx.job.findUnique({
         where: { id: offer.jobId }
@@ -32,7 +52,6 @@ export async function POST(req: Request) {
         throw new Error("Job already assigned")
       }
 
-      // assignment oluştur
       const assignment = await tx.jobAssignment.create({
         data: {
           jobId: job.id,
@@ -41,23 +60,20 @@ export async function POST(req: Request) {
         }
       })
 
-      // job status update
-      // job status update
-await tx.job.update({
-  where: { id: job.id },
-  data: {
-    status: "ASSIGNED"
-  }
-})
+      await tx.job.update({
+        where: { id: job.id },
+        data: {
+          status: "ASSIGNED"
+        }
+      })
 
-// driver artık meşgul
-await tx.user.update({
-  where: { id: offer.driverId },
-  data: { driverStatus: "BUSY" }
-})
+      await tx.user.update({
+        where: { id: offer.driverId },
+        data: {
+          driverStatus: "BUSY"
+        }
+      })
 
-
-      // kabul edilen offer
       await tx.driverOffer.update({
         where: { id: offer.id },
         data: {
@@ -66,7 +82,6 @@ await tx.user.update({
         }
       })
 
-      // diğer offerlar expire
       await tx.driverOffer.updateMany({
         where: {
           jobId: job.id,
@@ -85,14 +100,14 @@ await tx.user.update({
 
   } catch (err: unknown) {
 
-  const message =
-    err instanceof Error ? err.message : "Accept failed"
+    const message =
+      err instanceof Error ? err.message : "Accept failed"
 
-  return NextResponse.json(
-    { error: message },
-    { status: 400 }
-  )
+    return NextResponse.json(
+      { error: message },
+      { status: 400 }
+    )
 
-}
+  }
 
 }
