@@ -3,9 +3,7 @@ import { NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
 import { retryDispatch } from "@/dispatch/retryDispatch"
 
-
 export async function POST(req: Request) {
-
   const session = await getSession()
 
   if (!session) {
@@ -19,7 +17,6 @@ export async function POST(req: Request) {
   const offerId = segments[segments.length - 2]
 
   try {
-
     const offer = await prisma.driverOffer.findUnique({
       where: { id: offerId }
     })
@@ -38,40 +35,34 @@ export async function POST(req: Request) {
       )
     }
 
-    if (offer.status !== "PENDING") {
+    const updateResult = await prisma.driverOffer.updateMany({
+      where: {
+        id: offerId,
+        driverId: session.userId,
+        status: "PENDING"
+      },
+      data: {
+        status: "REJECTED",
+        respondedAt: new Date()
+      }
+    })
+
+    if (updateResult.count === 0) {
       return NextResponse.json(
         { error: "Offer not pending" },
         { status: 400 }
       )
     }
 
-    await prisma.driverOffer.update({
-  where: { id: offerId },
-  data: {
-    status: "REJECTED",
-    respondedAt: new Date()
-  }
-})
-
-// yeni driverlara tekrar dispatch
-await retryDispatch(offer.jobId)
-
-return NextResponse.json({
-  ok: true
-})
-
+    await retryDispatch(offer.jobId)
 
     return NextResponse.json({
       ok: true
     })
-
   } catch {
-
-  return NextResponse.json(
-    { error: "Reject failed" },
-    { status: 500 }
-  )
-
-}
-
+    return NextResponse.json(
+      { error: "Reject failed" },
+      { status: 500 }
+    )
+  }
 }

@@ -1,30 +1,29 @@
 import { prisma } from "@/lib/prisma"
-import { dispatchWorker } from "./dispatchWorker"
+import { retryDispatch } from "./retryDispatch"
 
+export async function checkOfferTimeouts() {
 
-export async function offerTimeoutWorker() {
-  
-  //console.log("offer timeout worker running")
+  const now = new Date()
 
-  const timeout = 10000 // 10 saniye
-
-  const expiredOffers = await prisma.driverOffer.findMany({
+  const expired = await prisma.driverOffer.findMany({
     where: {
       status: "PENDING",
-      createdAt: {
-        lt: new Date(Date.now() - timeout)
+      expiresAt: {
+        lt: now
       }
     }
   })
 
-  for (const offer of expiredOffers) {
+  for (const offer of expired) {
 
     await prisma.driverOffer.update({
       where: { id: offer.id },
       data: { status: "EXPIRED" }
     })
 
-    await dispatchWorker(offer.jobId)
+    console.log(`Offer timeout: ${offer.id}`)
+
+    await retryDispatch(offer.jobId)
 
   }
 

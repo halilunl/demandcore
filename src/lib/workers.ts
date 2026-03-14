@@ -1,5 +1,6 @@
-import { offerTimeoutWorker } from "@/dispatch/offerTimeoutWorker"
+import { checkOfferTimeouts } from "@/dispatch/checkOfferTimeouts"
+
 
 setInterval(() => {
-  offerTimeoutWorker()
+  checkOfferTimeouts()
 }, 3000)
