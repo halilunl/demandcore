@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
+import { eventBus, EVENTS } from "@/lib/events/eventBus"
 
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
@@ -59,31 +60,41 @@ export async function GET() {
         )
       }
 
+      // ilk snapshot
       await pushSnapshot()
 
+      // FAZ31 event listener
+      const onOfferCreated = async () => {
+        await pushSnapshot()
+      }
+
+      eventBus.on(EVENTS.OFFER_CREATED, onOfferCreated)
+
+      // heartbeat
       const heartbeat = setInterval(() => {
         if (closed) return
-        controller.enqueue(encoder.encode(sse("ping", { ts: Date.now() })))
-      }, 15000)
 
-      // Geçici faz30 yaklaşımı:
-      // ince-grain event yerine kısa aralıkta refresh ya da merkezi event bus bağlanacak.
-      const refresh = setInterval(async () => {
-        await pushSnapshot()
-      }, 5000)
+        controller.enqueue(
+          encoder.encode(
+            sse("ping", { ts: Date.now() })
+          )
+        )
+      }, 15000)
 
       const close = () => {
         if (closed) return
         closed = true
+
         clearInterval(heartbeat)
-        clearInterval(refresh)
+
+        // eventbus cleanup
+        eventBus.off(EVENTS.OFFER_CREATED, onOfferCreated)
+
         controller.close()
       }
 
-      // Web stream disconnect güvenliği
-     // @ts-expect-error: ReadableStream controller typing does not expose signal in Node
-controller.signal?.addEventListener?.("abort", close)
-
+      // @ts-expect-error: ReadableStream controller typing does not expose signal in Node
+      controller.signal?.addEventListener?.("abort", close)
     },
 
     cancel() {
